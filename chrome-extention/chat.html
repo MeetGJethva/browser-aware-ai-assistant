@@ -1,0 +1,36 @@
+<div class="__chat_header__" id="__chat_drag_handle__">
+    <div class="__chat_header_left__">
+        <div class="__chat_logo__">🤖</div>
+        <div>
+            <div class="__chat_title__">Web Chat AI</div>
+            <div class="__chat_status__">Page loaded</div>
+        </div>
+    </div>
+    <div class="__chat_header_actions__">
+        <button class="__chat_btn__" id="__chat_refresh_btn__" title="Re-read page">↺</button>
+        <button class="__chat_btn__" id="__chat_clear_btn__" title="Clear chat">🗑</button>
+        <button class="__chat_btn__" id="__chat_close_btn__" title="Close">✕</button>
+    </div>
+</div>
+
+<div class="__chat_context_bar__">
+    📄 Reading: <span id="__chat_page_label__"></span>
+</div>
+
+<div class="__chat_messages__" id="__chat_messages__">
+    <div class="__chat_empty__">
+        <div>🧠</div>
+        <div>I've read this page.<br />Ask me anything about it!</div>
+    </div>
+</div>
+
+<div class="__chat_suggestions__" id="__chat_suggestions__">
+    <div class="__suggestion_chip__">Summarize this page</div>
+    <div class="__suggestion_chip__">Key points?</div>
+    <div class="__suggestion_chip__">Explain simply</div>
+</div>
+
+<div class="__chat_input_area__">
+    <textarea id="__chat_input__" class="__chat_textarea__" placeholder="Ask about this page..." rows="1"></textarea>
+    <button id="__chat_send_btn__" class="__send_btn__">➤</button>
+</div>
