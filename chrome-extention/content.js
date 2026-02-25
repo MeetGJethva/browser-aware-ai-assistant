@@ -60,8 +60,7 @@
         .forEach((el) => el.remove());
       return (clone.innerText || clone.textContent || "")
         .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, 8000);
+        .trim();
     }
 
     pageContext = extractPageContent();
