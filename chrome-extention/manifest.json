@@ -19,7 +19,8 @@
         {
             "resources": [
                 "chat.css",
-                "chat.html"
+                "chat.html",
+                "marked.min.js"
             ],
             "matches": [
                 "<all_urls>"
