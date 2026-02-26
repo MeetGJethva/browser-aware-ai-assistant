@@ -21,6 +21,8 @@ User Question:
 
 Answer clearly and accurately based ONLY on the page content.
 Never answer if related answer is not present in context, say i cant find answer in this webpage.
+
+Always answer in Markdown formate.
 """)
 
 def get_answer(context: str, question: str) -> str:
