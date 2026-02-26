@@ -1,6 +1,6 @@
 chrome.action.onClicked.addListener((tab) => {
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
-    files: ["marked.min.js", "content.js"],
+    files: ["price_tracker.js", "marked.min.js", "content.js"],
   });
 });
