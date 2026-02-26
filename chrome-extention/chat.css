@@ -615,3 +615,44 @@
 .light .__resize_handle__:hover::before {
   border-color: #7755cc;
 }
+
+/* ── Source highlight button ─────────────────────────────────────── */
+.__msg_source_btn__ {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid #45475a;
+  border-radius: 20px;
+  color: #6c7086;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.__msg_source_btn__:hover {
+  border-color: #cba6f7;
+  color: #cba6f7;
+  background: rgba(203, 166, 247, 0.08);
+}
+
+.__msg_source_btn__.active {
+  border-color: #cba6f7;
+  color: #cba6f7;
+  background: rgba(203, 166, 247, 0.15);
+}
+
+.light .__msg_source_btn__ {
+  border-color: #d0d0e4;
+  color: #8888aa;
+}
+
+.light .__msg_source_btn__:hover,
+.light .__msg_source_btn__.active {
+  border-color: #7755cc;
+  color: #7755cc;
+  background: rgba(119, 85, 204, 0.08);
+}

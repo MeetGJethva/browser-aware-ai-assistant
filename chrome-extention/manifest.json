@@ -23,7 +23,8 @@
                 "marked.min.js",
                 "price_tracker.js",
                 "price_tracker.html",
-                "price_tracker.css"
+                "price_tracker.css",
+                "highlighter.js"
             ],
             "matches": [
                 "<all_urls>"
