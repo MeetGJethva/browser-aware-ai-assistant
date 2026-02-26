@@ -38,6 +38,10 @@
   priceScript.src = chrome.runtime.getURL("price_tracker.js");
   document.head.appendChild(priceScript);
 
+  const highlightScript = document.createElement("script");
+  highlightScript.src = chrome.runtime.getURL("highlighter.js");
+  document.head.appendChild(highlightScript);
+
   // ── Restore saved theme & size from storage ──────────────────────
   const savedTheme = localStorage.getItem("__chat_ai_theme__") || "dark";
   const savedW = localStorage.getItem("__chat_ai_width__");
@@ -115,9 +119,17 @@
     }
 
     // ── Add message bubble ───────────────────────────────────────
-    function addMessage(content, type = "ai") {
+    function addMessage(content, type = "ai", sources = []) {
       const empty = messagesEl.querySelector(".__chat_empty__");
       if (empty) empty.remove();
+
+      // Wrapper holds bubble + source button
+      const wrapper = document.createElement("div");
+      wrapper.style.cssText = `display:flex;flex-direction:column;align-items:${
+        type === "user" ? "flex-end" : "flex-start"
+      };max-width:88%;${
+        type === "user" ? "align-self:flex-end" : "align-self:flex-start"
+      }`;
 
       const bubble = document.createElement("div");
       bubble.className = `__msg_bubble__ ${
@@ -127,6 +139,7 @@
           ? "__msg_error__"
           : "__msg_ai__"
       }`;
+      bubble.style.maxWidth = "100%";
 
       if (type === "ai") {
         bubble.innerHTML = renderMarkdown(content);
@@ -134,10 +147,49 @@
         bubble.textContent = content;
       }
 
-      messagesEl.appendChild(bubble);
+      wrapper.appendChild(bubble);
+
+      // Add source highlight button for AI messages with sources
+      if (type === "ai" && sources && sources.length > 0) {
+        const sourceBtn = document.createElement("button");
+        sourceBtn.className = "__msg_source_btn__";
+        sourceBtn.innerHTML = `🔍 Show source`;
+
+        let isActive = false;
+        sourceBtn.addEventListener("click", () => {
+          isActive = !isActive;
+
+          // Clear all other active buttons
+          root.querySelectorAll(".__msg_source_btn__.active").forEach((b) => {
+            b.classList.remove("active");
+            b.innerHTML = "🔍 Show source";
+          });
+
+          if (isActive) {
+            // Highlight the most relevant source (first chunk)
+            const found = window.__Highlighter__?.highlight(sources[0]);
+            if (found) {
+              sourceBtn.classList.add("active");
+              sourceBtn.innerHTML = `✕ Clear highlight`;
+            } else {
+              sourceBtn.innerHTML = `⚠️ Not found`;
+              setTimeout(() => {
+                sourceBtn.innerHTML = "🔍 Show source";
+              }, 2000);
+              isActive = false;
+            }
+          } else {
+            window.__Highlighter__?.clear();
+            sourceBtn.innerHTML = "🔍 Show source";
+          }
+        });
+
+        wrapper.appendChild(sourceBtn);
+      }
+
+      messagesEl.appendChild(wrapper);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
-      // Track unread if bubble is minimized
       if (
         !root.isConnected ||
         document.getElementById("__web_chat_ai_bubble__")
@@ -190,7 +242,11 @@
         if (!res.ok) throw new Error(`Server error: ${res.status}`);
         const data = await res.json();
         removeTyping();
-        addMessage(data.answer || "No response received.", "ai");
+        addMessage(
+          data.answer || "No response received.",
+          "ai",
+          data.sources || []
+        );
       } catch (err) {
         removeTyping();
         addMessage(`⚠️ Could not connect to AI.\n${err.message}`, "error");

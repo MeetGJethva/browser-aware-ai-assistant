@@ -127,7 +127,7 @@ def process_page_and_query(page_content: str, query: str, top_k: int = 3) -> str
     4. Return joined context string
     """
     conn = get_db()
-
+    print(f"Page Content \n\n {page_content}")
     chunks = split_text(page_content)
     print(f"[RAG] Page split into {len(chunks)} chunks")
 
@@ -137,4 +137,5 @@ def process_page_and_query(page_content: str, query: str, top_k: int = 3) -> str
     top_contents = get_top_chunks(query, stored, top_k=top_k)
 
     context = "\n\n---\n\n".join(top_contents)
-    return context
+    # print(f"top content : {top_contents}")
+    return context, top_contents

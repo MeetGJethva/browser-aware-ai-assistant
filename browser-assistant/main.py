@@ -18,19 +18,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Update chat endpoint in main.py
 @app.post("/chat", response_model=ChatResponse)
 async def chat(data: ChatRequest):
     raw_context = data.context or ""
     if not raw_context.strip():
         return ChatResponse(answer="I couldn't read any content from this page.")
-    relevant_context = process_page_and_query(
+
+    relevant_context, source_chunks = process_page_and_query(
         page_content=raw_context,
         query=data.message,
         top_k=10
     )
     print(f"[CHAT] Sending {len(relevant_context)} chars of context to LLM")
     answer = get_answer(relevant_context, data.message)
-    return ChatResponse(answer=answer)
+    return ChatResponse(answer=answer, sources=source_chunks)  # ← return sources
 
 
 # ── Price Tracking ──────────────────────────────────────────────────────────

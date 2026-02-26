@@ -7,6 +7,7 @@ class URLRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     answer: str
+    sources: list[str] = []
     
 
 class ChatRequest(BaseModel):
