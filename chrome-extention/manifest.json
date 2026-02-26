@@ -20,7 +20,10 @@
             "resources": [
                 "chat.css",
                 "chat.html",
-                "marked.min.js"
+                "marked.min.js",
+                "price_tracker.js",
+                "price_tracker.html",
+                "price_tracker.css"
             ],
             "matches": [
                 "<all_urls>"

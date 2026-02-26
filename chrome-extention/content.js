@@ -11,7 +11,6 @@
   const LLM_API = "http://localhost:8090/chat";
 
   // ── Load marked.js for Markdown rendering ───────────────────────
-  // NEW
   function loadMarked(cb) {
     if (window.__marked_loaded__) {
       cb();
@@ -33,6 +32,11 @@
   link.rel = "stylesheet";
   link.href = chrome.runtime.getURL("chat.css");
   document.head.appendChild(link);
+
+  // ── Load price tracker module ────────────────────────────────────
+  const priceScript = document.createElement("script");
+  priceScript.src = chrome.runtime.getURL("price_tracker.js");
+  document.head.appendChild(priceScript);
 
   // ── Restore saved theme & size from storage ──────────────────────
   const savedTheme = localStorage.getItem("__chat_ai_theme__") || "dark";
@@ -338,6 +342,18 @@
       localStorage.setItem("__chat_ai_theme__", isDark ? "dark" : "light");
     });
 
+    // ── Price Tracker Button ─────────────────────────────────────
+    const priceBtn = root.querySelector("#__chat_price_btn__");
+    priceBtn?.addEventListener("click", () => {
+      const isLight = root.classList.contains("light");
+      // Wait for script to load if needed
+      if (window.__PriceTracker__) {
+        window.__PriceTracker__.trackAndShow(isLight);
+      } else {
+        setTimeout(() => window.__PriceTracker__?.trackAndShow(isLight), 500);
+      }
+    });
+
     // ── Feature 3: Resize Handle ─────────────────────────────────
     let isResizing = false;
     let resizeStartX, resizeStartY, resizeStartW, resizeStartH;
@@ -384,7 +400,8 @@
     let startX, startY, startLeft, startBottom;
 
     dragHandle.addEventListener("mousedown", (e) => {
-      if (e.target.closest("button")) return; // don't drag on button clicks
+      if (e.target.closest("button")) return;
+      if (document.getElementById("__price_panel__")) return; // price panel open
       isDragging = true;
       startX = e.clientX;
       startY = e.clientY;
