@@ -42,6 +42,10 @@
   highlightScript.src = chrome.runtime.getURL("highlighter.js");
   document.head.appendChild(highlightScript);
 
+  const ytScript = document.createElement("script");
+  ytScript.src = chrome.runtime.getURL("youtube_chat.js");
+  document.head.appendChild(ytScript);
+
   // ── Restore saved theme & size from storage ──────────────────────
   const savedTheme = localStorage.getItem("__chat_ai_theme__") || "dark";
   const savedW = localStorage.getItem("__chat_ai_width__");
@@ -199,6 +203,7 @@
           updateBubbleBadge();
         }
       }
+      return wrapper;
     }
 
     // ── Typing indicator ─────────────────────────────────────────
@@ -234,19 +239,29 @@
       suggestionsEl.style.display = "none";
 
       try {
-        const res = await fetch(LLM_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, context: pageContext }),
-        });
-        if (!res.ok) throw new Error(`Server error: ${res.status}`);
-        const data = await res.json();
-        removeTyping();
-        addMessage(
-          data.answer || "No response received.",
-          "ai",
-          data.sources || []
-        );
+        // ── YouTube mode ──────────────────────────────────────────
+        if (isYTMode && window.__YouTubeChat__?.isLoaded()) {
+          const data = await window.__YouTubeChat__.askQuestion(text);
+          removeTyping();
+          const wrapper = addMessage(data.answer || "No response.", "ai", []);
+          window.__YouTubeChat__.renderTimelines(data.timelines, wrapper);
+        }
+        // ── Normal mode ───────────────────────────────────────────
+        else {
+          const res = await fetch("http://localhost:8090/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, context: pageContext }),
+          });
+          if (!res.ok) throw new Error(`Server error: ${res.status}`);
+          const data = await res.json();
+          removeTyping();
+          addMessage(
+            data.answer || "No response received.",
+            "ai",
+            data.sources || []
+          );
+        }
       } catch (err) {
         removeTyping();
         addMessage(`⚠️ Could not connect to AI.\n${err.message}`, "error");
@@ -486,6 +501,29 @@
 
     document.addEventListener("mouseup", () => {
       isDragging = false;
+    });
+
+    // ── YouTube Mode ─────────────────────────────────────────────
+    const ytBar = root.querySelector("#__yt_bar__");
+    const ytStatus = root.querySelector("#__yt_status__");
+    const ytLoadBtn = root.querySelector("#__yt_load_btn__");
+    let isYTMode = false;
+
+    // Small delay to let youtube_chat.js finish loading
+    setTimeout(() => {
+      if (!window.__YouTubeChat__) return;
+
+      if (window.__YouTubeChat__.detectYouTube()) {
+        isYTMode = true;
+        ytBar.style.display = "flex";
+
+        // Auto-load transcript when extension opens on YouTube
+        window.__YouTubeChat__.loadTranscript(ytStatus);
+      }
+    }, 300);
+
+    ytLoadBtn?.addEventListener("click", () => {
+      window.__YouTubeChat__.loadTranscript(ytStatus);
     });
   }
 })();
