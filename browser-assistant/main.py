@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from models import ChatRequest, ChatResponse
-from rag_service import process_page_and_query
+from rag_service import process_page_and_query, find_best_source
 from llm_service import get_answer
 from price_service import record_price, get_price_history
 from pydantic import BaseModel
@@ -32,7 +32,11 @@ async def chat(data: ChatRequest):
     )
     print(f"[CHAT] Sending {len(relevant_context)} chars of context to LLM")
     answer = get_answer(relevant_context, data.message)
-    return ChatResponse(answer=answer, sources=source_chunks)  # ← return sources
+    best_idx = find_best_source(answer, source_chunks)
+    for s in source_chunks:
+        print(f"Sources: {s}")
+    print(f"\nBest source: {source_chunks[best_idx]}")
+    return ChatResponse(answer=answer, sources=source_chunks, best_source_idx=best_idx)  # ← return sources
 
 
 # ── Price Tracking ──────────────────────────────────────────────────────────
