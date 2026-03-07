@@ -95,13 +95,49 @@
     // ── Extract page text ────────────────────────────────────────
     function extractPageContent() {
       const clone = document.body.cloneNode(true);
+
+      // Remove all noise elements
       clone
         .querySelectorAll(
-          "script,style,noscript,nav,footer,header,aside,[aria-hidden='true']"
+          "script, style, noscript, nav, footer, header, aside, " +
+            "iframe, svg, canvas, video, audio, " +
+            "[aria-hidden='true'], [role='banner'], [role='navigation'], " +
+            "[role='complementary'], [role='contentinfo'], " +
+            // Remove our own extension UI
+            "#__web_chat_ai_root__, #__price_panel__, #__web_chat_ai_bubble__, " +
+            "#__web_chat_ai_styles__, #__web_chat_ai_marked__, " +
+            // Common noise classes
+            "[class*='cookie'], [class*='popup'], [class*='modal'], " +
+            "[class*='banner'], [class*='sidebar'], [class*='advertisement'], " +
+            "[class*='social'], [class*='share'], [class*='comment'], " +
+            "[id*='cookie'], [id*='popup'], [id*='sidebar'], [id*='ad-']"
         )
         .forEach((el) => el.remove());
-      return (clone.innerText || clone.textContent || "")
-        .replace(/\s+/g, " ")
+
+      // Fall back to full clone if no main content found
+      const source = clone;
+
+      // Extract and clean text
+      const raw = source.innerText || source.textContent || "";
+
+      return raw
+        .replace(/\t/g, " ") // tabs to spaces
+        .replace(/[ ]{2,}/g, " ") // multiple spaces to one
+        .replace(/\n{3,}/g, "\n\n") // max 2 consecutive newlines
+        .replace(/^\s+|\s+$/gm, "") // trim each line
+        .split("\n")
+        .filter((line) => {
+          const t = line.trim();
+          if (/^[^a-zA-Z0-9]*$/.test(t)) return false; // skip symbol-only lines
+          if (
+            /^(menu|home|search|login|sign in|sign up|subscribe|follow us|share|click here|read more|load more|show more|accept|reject|ok|cancel|close|back to top)$/i.test(
+              t
+            )
+          )
+            return false; // skip common UI text
+          return true;
+        })
+        .join("\n")
         .trim();
     }
 
@@ -123,7 +159,7 @@
     }
 
     // ── Add message bubble ───────────────────────────────────────
-    function addMessage(content, type = "ai", sources = []) {
+    function addMessage(content, type = "ai", sources = [], bestSourceIdx = 0) {
       const empty = messagesEl.querySelector(".__chat_empty__");
       if (empty) empty.remove();
 
@@ -171,7 +207,8 @@
 
           if (isActive) {
             // Highlight the most relevant source (first chunk)
-            const found = window.__Highlighter__?.highlight(sources[0]);
+            const bestSource = sources[bestSourceIdx] || sources[0];
+            const found = window.__Highlighter__?.highlight(bestSource);
             if (found) {
               sourceBtn.classList.add("active");
               sourceBtn.innerHTML = `✕ Clear highlight`;

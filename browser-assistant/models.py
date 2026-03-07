@@ -8,6 +8,7 @@ class URLRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     sources: list[str] = []
+    best_source_idx: int = 0 
     
 
 class ChatRequest(BaseModel):

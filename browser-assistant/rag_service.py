@@ -2,7 +2,7 @@ import hashlib
 import json
 import sqlite3
 import numpy as np
-from pathlib import Path
+import re
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -50,6 +50,23 @@ def embed_text(text: str) -> list[float]:
 def split_text(content: str) -> list[str]:
     return text_splitter.split_text(content)
 
+def clean_chunk(text: str) -> str:
+    text = text.strip()
+    # Remove leading dots, punctuation, bullets, dashes
+    text = re.sub(r'^[\.\,\;\:\!\?\-\–\—\•\·\*\s]+', '', text)
+    # Remove trailing incomplete citations like "^ " or ".[6]"
+    text = re.sub(r'\[\d+\]', '', text)        # remove [6] [7] etc
+    text = re.sub(r'\^\s*\w*', '', text)        # remove ^ footnote markers
+    # Remove lines that are purely citations/references (start with ISBN, DOI, p. )
+    lines = text.split('\n')
+    lines = [l for l in lines if not re.match(
+        r'^\s*(ISBN|DOI|doi|pp\.|p\.|S2CID|OCLC|PMID|Archived|Retrieved|Jump up)', l
+    )]
+    text = '\n'.join(lines).strip()
+    # Remove leading dots/punctuation again after line filtering
+    text = re.sub(r'^[\.\,\;\:\!\?\-\–\—\•\·\*\s]+', '', text)
+    return text
+
 
 def store_chunks(chunks: list[str], conn: sqlite3.Connection) -> list[dict]:
     """
@@ -63,6 +80,7 @@ def store_chunks(chunks: list[str], conn: sqlite3.Connection) -> list[dict]:
 
     for chunk in chunks:
         chunk = chunk.strip()
+        chunk = clean_chunk(chunk)
         if not chunk:
             continue
 
@@ -139,3 +157,22 @@ def process_page_and_query(page_content: str, query: str, top_k: int = 3) -> str
     context = "\n\n---\n\n".join(top_contents)
     # print(f"top content : {top_contents}")
     return context, top_contents
+
+
+def find_best_source(answer: str, source_chunks: list[str]) -> int:
+    """
+    Given LLM answer and list of source chunks,
+    return index of chunk most semantically similar to the answer.
+    """
+    if not source_chunks:
+        return 0
+    if len(source_chunks) == 1:
+        return 0
+
+    answer_emb  = np.array(embed_text(answer)).reshape(1, -1)
+    source_embs = np.array([embed_text(chunk) for chunk in source_chunks])
+    scores      = cosine_similarity(answer_emb, source_embs)[0]
+
+    best_idx = int(np.argmax(scores))
+    print(f"[RAG] Best source index: {best_idx} | scores: {[round(s,3) for s in scores]}")
+    return best_idx
