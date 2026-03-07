@@ -24,7 +24,8 @@
                 "price_tracker.js",
                 "price_tracker.html",
                 "price_tracker.css",
-                "highlighter.js"
+                "highlighter.js",
+                "youtube_chat.js"
             ],
             "matches": [
                 "<all_urls>"

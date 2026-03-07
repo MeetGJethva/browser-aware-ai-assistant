@@ -6,6 +6,7 @@ chrome.action.onClicked.addListener((tab) => {
       "price_tracker.js",
       "marked.min.js",
       "content.js",
+      "youtube_chat.js",
     ],
   });
 });
