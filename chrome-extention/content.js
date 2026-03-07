@@ -296,7 +296,8 @@
           addMessage(
             data.answer || "No response received.",
             "ai",
-            data.sources || []
+            data.sources || [],
+            data.best_source_idx || 0
           );
         }
       } catch (err) {
