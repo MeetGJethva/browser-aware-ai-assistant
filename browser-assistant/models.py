@@ -14,3 +14,14 @@ class ChatResponse(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     context: str | None = None  # page content from extension
+
+
+class SummarizeRequest(BaseModel):
+    context: str
+    page_title: str = "Untitled Page"
+    page_url: str = ""
+
+
+class SummarizeResponse(BaseModel):
+    summary: str
+    doc_url: str

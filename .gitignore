@@ -2,3 +2,7 @@
 __pycache__/
 *.db
 *.lock
+
+# Google OAuth credentials — never commit these
+browser-assistant/google_client_secret.json
+browser-assistant/google_token.json
