@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from models import ChatRequest, ChatResponse
+from models import ChatRequest, ChatResponse, SummarizeRequest, SummarizeResponse
 from rag_service import process_page_and_query, find_best_source
 from llm_service import get_answer
 from price_service import record_price, get_price_history
+from gdocs_service import create_google_doc
 from youtube_service import extract_video_id, fetch_transcript, build_timed_chunks, format_timestamp
 from youtube_rag import store_youtube_chunks, query_youtube
 from pydantic import BaseModel
@@ -139,6 +140,110 @@ Question: {data.message}"""
     ]
 
     return {"answer": answer, "timelines": timelines}
+
+
+# ── YouTube Summarize to Google Docs ────────────────────────────────────────
+
+class YouTubeSummarizeRequest(BaseModel):
+    video_id:    str
+    video_title: str = "YouTube Video"
+    video_url:   str = ""
+
+@app.post("/youtube/summarize-to-gdocs")
+async def youtube_summarize_to_gdocs(data: YouTubeSummarizeRequest):
+    """Summarize a YouTube video transcript and save it as a Google Doc."""
+    # Fetch broad top-k chunks to cover the whole video
+    top_chunks = query_youtube(data.video_id, "summarize the full video", top_k=30)
+
+    if not top_chunks:
+        return {"summary": "⚠️ Transcript not loaded. Please click 'Load Video' first.", "doc_url": ""}
+
+    # Build ordered transcript text (sort by start_time)
+    top_chunks_sorted = sorted(top_chunks, key=lambda c: c.get("start_time", 0))
+    transcript_text = "\n\n".join(
+        f"[{c['ts_label']}] {c['text']}" for c in top_chunks_sorted
+    )
+
+    summarize_prompt = f"""You are an expert video content summarizer. Summarize the following YouTube video transcript clearly and concisely.
+
+Video Title: {data.video_title}
+Video URL: {data.video_url}
+
+Transcript (with timestamps):
+{transcript_text[:10000]}
+
+Provide a well-structured summary in this format:
+## Summary of: {data.video_title}
+
+**URL:** {data.video_url}
+
+### Overview
+(2-3 sentence overview of what the video covers)
+
+### Key Topics Covered
+(Bullet list of the main topics, ideas, or segments discussed)
+
+### Notable Insights
+(2-3 standout points, quotes, or conclusions from the video)
+
+### Conclusion
+(1-2 sentence concluding remark)"""
+
+    print(f"[YT-SUMMARIZE] Summarizing YouTube video: {data.video_title}")
+    summary_text = get_answer("", summarize_prompt)
+
+    doc_title = f"Video Summary: {data.video_title[:70]}"
+    print(f"[YT-SUMMARIZE] Creating Google Doc: {doc_title}")
+    doc_url = create_google_doc(doc_title, summary_text, source_url=data.video_url)
+    print(f"[YT-SUMMARIZE] Doc created: {doc_url}")
+
+    return {"summary": summary_text, "doc_url": doc_url}
+
+
+# ── Summarize & Save to Google Docs ─────────────────────────────────────────
+
+@app.post("/summarize-to-gdocs", response_model=SummarizeResponse)
+async def summarize_to_gdocs(data: SummarizeRequest):
+    """Summarize the full page content with LLM and save it as a Google Doc."""
+    if not data.context.strip():
+        return SummarizeResponse(
+            summary="No page content found to summarize.",
+            doc_url=""
+        )
+
+    # Build a structured summary prompt
+    summarize_prompt = f"""You are an expert summarizer. Summarize the following webpage content clearly and concisely.
+
+Page URL: {data.page_url}
+Page Title: {data.page_title}
+
+Webpage Content:
+{data.context[:12000]}  
+
+Provide a well-structured summary in this format:
+## Summary of: {data.page_title}
+
+**URL:** {data.page_url}
+
+### Overview
+(2-3 sentence overview of what the page is about)
+
+### Key Points
+(Bullet list of the most important facts, findings, or takeaways)
+
+### Conclusion
+(1-2 sentence concluding remark)"""
+
+    print(f"[SUMMARIZE] Summarizing page: {data.page_title}")
+    summary_text = get_answer("", summarize_prompt)
+
+    # Create richly formatted Google Doc
+    doc_title = f"Summary: {data.page_title[:80]}"
+    print(f"[SUMMARIZE] Creating Google Doc: {doc_title}")
+    doc_url = create_google_doc(doc_title, summary_text, source_url=data.page_url)
+    print(f"[SUMMARIZE] Doc created: {doc_url}")
+
+    return SummarizeResponse(summary=summary_text, doc_url=doc_url)
 
 
 if __name__ == "__main__":

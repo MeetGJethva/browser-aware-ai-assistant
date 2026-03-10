@@ -70,43 +70,44 @@
   // ────────────────────────────────────────────────────────────────
   function initChat() {
     // DOM refs
-    const messagesEl = root.querySelector("#__chat_messages__");
-    const inputEl = root.querySelector("#__chat_input__");
-    const sendBtn = root.querySelector("#__chat_send_btn__");
-    const closeBtn = root.querySelector("#__chat_close_btn__");
-    const clearBtn = root.querySelector("#__chat_clear_btn__");
-    const refreshBtn = root.querySelector("#__chat_refresh_btn__");
-    const minimizeBtn = root.querySelector("#__chat_minimize_btn__");
-    const themeBtn = root.querySelector("#__chat_theme_btn__");
-    const pageLabel = root.querySelector("#__chat_page_label__");
-    const suggestions = root.querySelectorAll(".__suggestion_chip__");
+    const messagesEl   = root.querySelector("#__chat_messages__");
+    const inputEl      = root.querySelector("#__chat_input__");
+    const sendBtn      = root.querySelector("#__chat_send_btn__");
+    const closeBtn     = root.querySelector("#__chat_close_btn__");
+    const clearBtn     = root.querySelector("#__chat_clear_btn__");
+    const refreshBtn   = root.querySelector("#__chat_refresh_btn__");
+    const minimizeBtn  = root.querySelector("#__chat_minimize_btn__");
+    const themeBtn     = root.querySelector("#__chat_theme_btn__");
+    const pageLabel    = root.querySelector("#__chat_page_label__");
     const suggestionsEl = root.querySelector("#__chat_suggestions__");
-    const dragHandle = root.querySelector("#__chat_drag_handle__");
+    const dragHandle   = root.querySelector("#__chat_drag_handle__");
     const resizeHandle = root.querySelector("#__chat_resize_handle__");
+
+    // Hamburger / Drawer
+    const menuBtn      = root.querySelector("#__chat_menu_btn__");
+    const drawer       = root.querySelector("#__chat_drawer__");
+    const drawerOverlay = root.querySelector("#__chat_drawer_overlay__");
 
     // State
     let pageContext = "";
-    let isLoading = false;
+    let isLoading   = false;
     let unreadCount = 0;
-    let isDark = savedTheme !== "light";
+    let isDark      = savedTheme !== "light";
+    let isYTMode    = false;
 
     pageLabel.textContent = window.location.hostname;
 
     // ── Extract page text ────────────────────────────────────────
     function extractPageContent() {
       const clone = document.body.cloneNode(true);
-
-      // Remove all noise elements
       clone
         .querySelectorAll(
           "script, style, noscript, nav, footer, header, aside, " +
             "iframe, svg, canvas, video, audio, " +
             "[aria-hidden='true'], [role='banner'], [role='navigation'], " +
             "[role='complementary'], [role='contentinfo'], " +
-            // Remove our own extension UI
             "#__web_chat_ai_root__, #__price_panel__, #__web_chat_ai_bubble__, " +
             "#__web_chat_ai_styles__, #__web_chat_ai_marked__, " +
-            // Common noise classes
             "[class*='cookie'], [class*='popup'], [class*='modal'], " +
             "[class*='banner'], [class*='sidebar'], [class*='advertisement'], " +
             "[class*='social'], [class*='share'], [class*='comment'], " +
@@ -114,27 +115,24 @@
         )
         .forEach((el) => el.remove());
 
-      // Fall back to full clone if no main content found
       const source = clone;
-
-      // Extract and clean text
       const raw = source.innerText || source.textContent || "";
 
       return raw
-        .replace(/\t/g, " ") // tabs to spaces
-        .replace(/[ ]{2,}/g, " ") // multiple spaces to one
-        .replace(/\n{3,}/g, "\n\n") // max 2 consecutive newlines
-        .replace(/^\s+|\s+$/gm, "") // trim each line
+        .replace(/\t/g, " ")
+        .replace(/[ ]{2,}/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .replace(/^\s+|\s+$/gm, "")
         .split("\n")
         .filter((line) => {
           const t = line.trim();
-          if (/^[^a-zA-Z0-9]*$/.test(t)) return false; // skip symbol-only lines
+          if (/^[^a-zA-Z0-9]*$/.test(t)) return false;
           if (
             /^(menu|home|search|login|sign in|sign up|subscribe|follow us|share|click here|read more|load more|show more|accept|reject|ok|cancel|close|back to top)$/i.test(
               t
             )
           )
-            return false; // skip common UI text
+            return false;
           return true;
         })
         .join("\n")
@@ -143,6 +141,69 @@
 
     pageContext = extractPageContent();
 
+    // ── Dynamic Suggestion Chips ─────────────────────────────────
+    function detectPageType() {
+      const url  = window.location.href.toLowerCase();
+      const host = window.location.hostname.toLowerCase();
+
+      if (host.includes("youtube.com") && url.includes("watch")) return "youtube";
+      if (
+        host.includes("amazon") || host.includes("flipkart") ||
+        host.includes("ebay") || host.includes("shopify") ||
+        host.includes("shop") || url.includes("/product") ||
+        url.includes("/dp/") || url.includes("/item")
+      ) return "ecommerce";
+      if (
+        host.includes("news") || host.includes("blog") ||
+        url.includes("/article") || url.includes("/news") ||
+        url.includes("/post") || url.includes("/story")
+      ) return "news";
+      return "general";
+    }
+
+    function generateSuggestions(type) {
+      const sets = {
+        youtube: [
+          "Summarize this video",
+          "Key moments?",
+          "What topics are covered?",
+        ],
+        ecommerce: [
+          "What are reviewers saying?",
+          "Pros & cons?",
+          "Is this worth buying?",
+        ],
+        news: [
+          "Summarize this article",
+          "What are the key facts?",
+          "What's the author's argument?",
+        ],
+        general: [
+          "Summarize this page",
+          "Key points?",
+          "Explain simply",
+        ],
+      };
+      return sets[type] || sets.general;
+    }
+
+    function renderSuggestions(chips) {
+      suggestionsEl.innerHTML = "";
+      chips.forEach((text) => {
+        const chip = document.createElement("div");
+        chip.className = "__suggestion_chip__";
+        chip.textContent = text;
+        chip.addEventListener("click", () => {
+          inputEl.value = text;
+          sendMessage();
+        });
+        suggestionsEl.appendChild(chip);
+      });
+    }
+
+    // Render default suggestions based on URL before YouTube detection
+    renderSuggestions(generateSuggestions(detectPageType()));
+
     // ── Render markdown safely ───────────────────────────────────
     function renderMarkdown(text) {
       if (window.marked) {
@@ -150,7 +211,6 @@
           return window.marked.parse(text, { breaks: true, gfm: true });
         } catch (e) {}
       }
-      // Fallback: escape HTML
       return text
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
@@ -163,7 +223,6 @@
       const empty = messagesEl.querySelector(".__chat_empty__");
       if (empty) empty.remove();
 
-      // Wrapper holds bubble + source button
       const wrapper = document.createElement("div");
       wrapper.style.cssText = `display:flex;flex-direction:column;align-items:${
         type === "user" ? "flex-end" : "flex-start"
@@ -189,7 +248,6 @@
 
       wrapper.appendChild(bubble);
 
-      // Add source highlight button for AI messages with sources
       if (type === "ai" && sources && sources.length > 0) {
         const sourceBtn = document.createElement("button");
         sourceBtn.className = "__msg_source_btn__";
@@ -198,15 +256,12 @@
         let isActive = false;
         sourceBtn.addEventListener("click", () => {
           isActive = !isActive;
-
-          // Clear all other active buttons
           root.querySelectorAll(".__msg_source_btn__.active").forEach((b) => {
             b.classList.remove("active");
             b.innerHTML = "🔍 Show source";
           });
 
           if (isActive) {
-            // Highlight the most relevant source (first chunk)
             const bestSource = sources[bestSourceIdx] || sources[0];
             const found = window.__Highlighter__?.highlight(bestSource);
             if (found) {
@@ -214,9 +269,7 @@
               sourceBtn.innerHTML = `✕ Clear highlight`;
             } else {
               sourceBtn.innerHTML = `⚠️ Not found`;
-              setTimeout(() => {
-                sourceBtn.innerHTML = "🔍 Show source";
-              }, 2000);
+              setTimeout(() => { sourceBtn.innerHTML = "🔍 Show source"; }, 2000);
               isActive = false;
             }
           } else {
@@ -231,10 +284,7 @@
       messagesEl.appendChild(wrapper);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
-      if (
-        !root.isConnected ||
-        document.getElementById("__web_chat_ai_bubble__")
-      ) {
+      if (!root.isConnected || document.getElementById("__web_chat_ai_bubble__")) {
         if (type === "ai") {
           unreadCount++;
           updateBubbleBadge();
@@ -338,24 +388,37 @@
         </div>
       `;
       suggestionsEl.style.display = "flex";
+      renderSuggestions(generateSuggestions(isYTMode ? "youtube" : detectPageType()));
       unreadCount = 0;
+      closeDrawer();
     });
 
     refreshBtn.addEventListener("click", () => {
       pageContext = extractPageContent();
       pageLabel.textContent = window.location.hostname + " ✓";
-      setTimeout(
-        () => (pageLabel.textContent = window.location.hostname),
-        2000
-      );
+      setTimeout(() => (pageLabel.textContent = window.location.hostname), 2000);
+      closeDrawer();
     });
 
-    suggestions.forEach((chip) => {
-      chip.addEventListener("click", () => {
-        inputEl.value = chip.textContent;
-        sendMessage();
-      });
+    // ── Hamburger / Drawer ───────────────────────────────────────
+    function openDrawer() {
+      drawer.classList.add("open");
+      drawerOverlay.classList.add("open");
+      menuBtn.classList.add("open");
+    }
+
+    function closeDrawer() {
+      drawer.classList.remove("open");
+      drawerOverlay.classList.remove("open");
+      menuBtn.classList.remove("open");
+    }
+
+    menuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      drawer.classList.contains("open") ? closeDrawer() : openDrawer();
     });
+
+    drawerOverlay.addEventListener("click", closeDrawer);
 
     // ── Feature 1: Minimize to Bubble ────────────────────────────
     function updateBubbleBadge() {
@@ -375,36 +438,28 @@
     }
 
     function minimize() {
-      // Save current position
       const rect = root.getBoundingClientRect();
-      const bubbleBottom =
-        window.innerHeight - rect.bottom + rect.height / 2 - 28;
-      const bubbleRight = window.innerWidth - rect.right + rect.width / 2 - 28;
+      const bubbleBottom = window.innerHeight - rect.bottom + rect.height / 2 - 28;
+      const bubbleRight  = window.innerWidth  - rect.right  + rect.width  / 2 - 28;
 
       root.style.display = "none";
 
-      // Create bubble
       const bubble = document.createElement("div");
       bubble.id = "__web_chat_ai_bubble__";
       bubble.innerHTML = "🤖";
       bubble.style.bottom = Math.max(16, bubbleBottom) + "px";
-      bubble.style.right = Math.max(16, bubbleRight) + "px";
+      bubble.style.right  = Math.max(16, bubbleRight)  + "px";
       document.body.appendChild(bubble);
 
       updateBubbleBadge();
 
-      // Drag bubble
-      let bDrag = false,
-        bStartX,
-        bStartY,
-        bLeft,
-        bBottom;
+      let bDrag = false, bStartX, bStartY, bLeft, bBottom;
       bubble.addEventListener("mousedown", (e) => {
-        bDrag = true;
+        bDrag   = true;
         bStartX = e.clientX;
         bStartY = e.clientY;
         const r = bubble.getBoundingClientRect();
-        bLeft = r.left;
+        bLeft   = r.left;
         bBottom = window.innerHeight - r.bottom;
         e.preventDefault();
       });
@@ -413,24 +468,15 @@
         if (!bDrag) return;
         const dx = e.clientX - bStartX;
         const dy = e.clientY - bStartY;
-        bubble.style.left =
-          Math.max(8, Math.min(window.innerWidth - 64, bLeft + dx)) + "px";
-        bubble.style.bottom =
-          Math.max(8, Math.min(window.innerHeight - 64, bBottom - dy)) + "px";
-        bubble.style.right = "auto";
+        bubble.style.left   = Math.max(8, Math.min(window.innerWidth  - 64, bLeft   + dx)) + "px";
+        bubble.style.bottom = Math.max(8, Math.min(window.innerHeight - 64, bBottom - dy)) + "px";
+        bubble.style.right  = "auto";
       });
 
-      document.addEventListener("mouseup", () => {
-        bDrag = false;
-      });
+      document.addEventListener("mouseup", () => { bDrag = false; });
 
-      // Click to restore
       bubble.addEventListener("click", (e) => {
-        if (
-          Math.abs(e.clientX - bStartX) > 5 ||
-          Math.abs(e.clientY - bStartY) > 5
-        )
-          return;
+        if (Math.abs(e.clientX - bStartX) > 5 || Math.abs(e.clientY - bStartY) > 5) return;
         restore(bubble);
       });
     }
@@ -449,18 +495,91 @@
       isDark = !isDark;
       root.classList.toggle("light", !isDark);
       localStorage.setItem("__chat_ai_theme__", isDark ? "dark" : "light");
+      closeDrawer();
     });
 
     // ── Price Tracker Button ─────────────────────────────────────
     const priceBtn = root.querySelector("#__chat_price_btn__");
     priceBtn?.addEventListener("click", () => {
       const isLight = root.classList.contains("light");
-      // Wait for script to load if needed
       if (window.__PriceTracker__) {
         window.__PriceTracker__.trackAndShow(isLight);
       } else {
         setTimeout(() => window.__PriceTracker__?.trackAndShow(isLight), 500);
       }
+      closeDrawer();
+    });
+
+    // ── Summarize & Save to Google Docs Button ───────────────────
+    const gdocsBtn = root.querySelector("#__chat_gdocs_btn__");
+    gdocsBtn?.addEventListener("click", async () => {
+      if (isLoading) return;
+
+      closeDrawer();
+      isLoading = true;
+      gdocsBtn.disabled = true;
+      gdocsBtn.querySelector(".__drawer_label__").textContent = "Saving…";
+      suggestionsEl.style.display = "none";
+
+      // Detect whether we're in YouTube mode with transcript loaded
+      const ytLoaded = isYTMode && window.__YouTubeChat__?.isLoaded();
+      const userMsg  = ytLoaded
+        ? "Summarize this video and save to Google Docs"
+        : "Summarize this page and save to Google Docs";
+
+      addMessage(userMsg, "user");
+      showTyping();
+
+      try {
+        let res, data;
+
+        if (ytLoaded) {
+          // ── YouTube mode: use video transcript ──────────────────
+          const videoId    = window.__YouTubeChat__?.getVideoId?.() || "";
+          const videoTitle = document.title || "YouTube Video";
+          const videoUrl   = window.location.href;
+
+          res = await fetch("http://localhost:8090/youtube/summarize-to-gdocs", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ video_id: videoId, video_title: videoTitle, video_url: videoUrl }),
+          });
+        } else {
+          // ── Normal page mode ────────────────────────────────────
+          const pageTitle = document.title || window.location.hostname;
+          const pageUrl   = window.location.href;
+
+          res = await fetch("http://localhost:8090/summarize-to-gdocs", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ context: pageContext, page_title: pageTitle, page_url: pageUrl }),
+          });
+        }
+
+        removeTyping();
+
+        if (!res.ok) throw new Error(`Server error: ${res.status}`);
+        data = await res.json();
+
+        const wrapper = addMessage(data.summary || "Summary generated.", "ai", []);
+
+        if (data.doc_url) {
+          const docsLink = document.createElement("a");
+          docsLink.href   = data.doc_url;
+          docsLink.target = "_blank";
+          docsLink.rel    = "noopener noreferrer";
+          docsLink.className = "__gdocs_link__";
+          docsLink.innerHTML = `<span>📄</span> Open in Google Docs`;
+          wrapper.appendChild(docsLink);
+        }
+      } catch (err) {
+        removeTyping();
+        addMessage(`⚠️ Could not summarize or save to Google Docs.\n${err.message}`, "error");
+      }
+
+      isLoading = false;
+      gdocsBtn.disabled = false;
+      gdocsBtn.querySelector(".__drawer_label__").textContent = "Save to Google Docs";
     });
 
     // ── Feature 3: Resize Handle ─────────────────────────────────
@@ -468,7 +587,7 @@
     let resizeStartX, resizeStartY, resizeStartW, resizeStartH;
 
     resizeHandle.addEventListener("mousedown", (e) => {
-      isResizing = true;
+      isResizing  = true;
       resizeStartX = e.clientX;
       resizeStartY = e.clientY;
       resizeStartW = root.offsetWidth;
@@ -479,27 +598,20 @@
 
     document.addEventListener("mousemove", (e) => {
       if (!isResizing) return;
-      const dx = resizeStartX - e.clientX; // dragging left = wider
-      const dy = resizeStartY - e.clientY; // dragging up   = taller
-      const newW = Math.max(
-        280,
-        Math.min(window.innerWidth - 32, resizeStartW + dx)
-      );
-      const newH = Math.max(
-        300,
-        Math.min(window.innerHeight - 32, resizeStartH + dy)
-      );
-      root.style.width = newW + "px";
-      root.style.height = newH + "px";
-      root.style.maxWidth = "none";
+      const dx = resizeStartX - e.clientX;
+      const dy = resizeStartY - e.clientY;
+      const newW = Math.max(280, Math.min(window.innerWidth  - 32, resizeStartW + dx));
+      const newH = Math.max(300, Math.min(window.innerHeight - 32, resizeStartH + dy));
+      root.style.width    = newW + "px";
+      root.style.height   = newH + "px";
+      root.style.maxWidth  = "none";
       root.style.maxHeight = "none";
     });
 
     document.addEventListener("mouseup", () => {
       if (isResizing) {
         isResizing = false;
-        // Save to localStorage
-        localStorage.setItem("__chat_ai_width__", root.style.width);
+        localStorage.setItem("__chat_ai_width__",  root.style.width);
         localStorage.setItem("__chat_ai_height__", root.style.height);
       }
     });
@@ -510,12 +622,12 @@
 
     dragHandle.addEventListener("mousedown", (e) => {
       if (e.target.closest("button")) return;
-      if (document.getElementById("__price_panel__")) return; // price panel open
-      isDragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      const rect = root.getBoundingClientRect();
-      startLeft = rect.left;
+      if (document.getElementById("__price_panel__")) return;
+      isDragging  = true;
+      startX      = e.clientX;
+      startY      = e.clientY;
+      const rect  = root.getBoundingClientRect();
+      startLeft   = rect.left;
       startBottom = window.innerHeight - rect.bottom;
       root.style.transition = "none";
     });
@@ -524,36 +636,29 @@
       if (!isDragging) return;
       const dx = e.clientX - startX;
       const dy = e.clientY - startY;
-      const newLeft = Math.max(
-        8,
-        Math.min(window.innerWidth - root.offsetWidth - 8, startLeft + dx)
-      );
-      const newBottom = Math.max(
-        8,
-        Math.min(window.innerHeight - root.offsetHeight - 8, startBottom - dy)
-      );
-      root.style.right = "auto";
-      root.style.left = newLeft + "px";
+      const newLeft   = Math.max(8, Math.min(window.innerWidth  - root.offsetWidth  - 8, startLeft   + dx));
+      const newBottom = Math.max(8, Math.min(window.innerHeight - root.offsetHeight - 8, startBottom - dy));
+      root.style.right  = "auto";
+      root.style.left   = newLeft   + "px";
       root.style.bottom = newBottom + "px";
     });
 
-    document.addEventListener("mouseup", () => {
-      isDragging = false;
-    });
+    document.addEventListener("mouseup", () => { isDragging = false; });
 
     // ── YouTube Mode ─────────────────────────────────────────────
-    const ytBar = root.querySelector("#__yt_bar__");
-    const ytStatus = root.querySelector("#__yt_status__");
+    const ytBar     = root.querySelector("#__yt_bar__");
+    const ytStatus  = root.querySelector("#__yt_status__");
     const ytLoadBtn = root.querySelector("#__yt_load_btn__");
-    let isYTMode = false;
 
-    // Small delay to let youtube_chat.js finish loading
     setTimeout(() => {
       if (!window.__YouTubeChat__) return;
 
       if (window.__YouTubeChat__.detectYouTube()) {
         isYTMode = true;
         ytBar.style.display = "flex";
+
+        // Re-render suggestions for YouTube
+        renderSuggestions(generateSuggestions("youtube"));
 
         // Auto-load transcript when extension opens on YouTube
         window.__YouTubeChat__.loadTranscript(ytStatus);
